@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel Monitoring Data</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: url('bgimg.avif') no-repeat center center fixed;
+            background-size: cover;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        header {
+            background-color: rgba(238, 161, 244, 0.8); /* Semi-transparent background */
+            padding: 20px;
+            text-align: center;
+            color: #fff;
+        }
+        header img {
+            width: 100px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        header h1 {
+            margin: 10px 0;
+            font-size: 2em;
+        }
+        #content {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 20px;
+        }
+        #data-container, #temperature-container, .gauge-container, .chart-container, #project-details {
+            background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent background */
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            margin: 20px;
+            padding: 20px;
+            text-align: center;
+        }
+        #data-container, #temperature-container {
+            width: 100%;
+            max-width: 700px;
+            font-size: 2em;
+        }
+        .gauge-container {
+            position: relative;
+            height: 350px;
+            width: 350px;
+        }
+        .gauge {
+            width: 100%;
+            height: 100%;
+            border: 10px solid #333;
+            border-radius: 50%;
+            position: relative;
+            background: #f0f0f0;
+        }
+        .needle {
+            width: 2px;
+            height: 45%;
+            background-color: #333;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            transform: rotate(0deg) translateX(-50%);
+            transition: transform 0.5s ease;
+        }
+        .gauge-labels {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            font-size: 1em;
+        }
+        .gauge-label {
+            font-size: 1.2em;
+            color: #333;
+            position: absolute;
+            transform: translate(-50%, -50%);
+        }
+        .gauge-label:nth-child(1) { top: 10%; left: 50%; }
+        .gauge-label:nth-child(2) { top: 25%; left: 75%; }
+        .gauge-label:nth-child(3) { top: 50%; left: 90%; }
+        .gauge-label:nth-child(4) { top: 75%; left: 75%; }
+        .gauge-label:nth-child(5) { top: 90%; left: 50%; }
+        .gauge-label:nth-child(6) { top: 75%; left: 25%; }
+        .gauge-label:nth-child(7) { top: 50%; left: 10%; }
+        .chart-container {
+            width: 100%;
+            max-width: 800px;
+        }
+        footer {
+            background-color: rgba(238, 168, 239, 0.8); /* Semi-transparent background */
+            color: #fff;
+            text-align: center;
+            padding: 10px 0;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+        #message, #temperature-message, #project-details {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .message-full {
+            color: green;
+        }
+        .message-empty {
+            color: red;
+        }
+        .temp-warning {
+            color: orange;
+        }
+        .temp-good {
+            color: green;
+        }
+        #project-details {
+            font-size: 1.2em;
+            font-weight: normal;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <img src="Central_University_of_Jammu_Logo (1).png" alt="CU Jammu Logo">
+        <h1>Real time Monitoring of Diesel Generator</h1>
+    </header>
+
+    <div id="content">
+        <div id="data-container">
+            <div id="data">Loading data...</div>
+            <div id="message"></div>
+        </div>
+
+        <div id="temperature-container">
+            <div id="temperature">Loading temperature...</div>
+            <div id="temperature-message"></div>
+        </div>
+
+        <div class="gauge-container">
+            <canvas id="speedometer" width="350" height="350"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+
+        <div id="project-details">
+            <p>Project Submitted by:</p>
+            <p>Saurav Kumar</p>
+            <p>Rajnish Shivam</p>
+            <p>Guided By:</p>
+            <p>Dr.Priyank Sharma</p>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Central University of Jammu</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script>
+        const channelID = '2631342';  // Ensure no extra spaces
+        const readAPIKey = '0F6M0ZAGFE55Y7ZO';
+
+        const canvas = document.getElementById('speedometer');
+        const ctx = canvas.getContext('2d');
+
+        const radius = canvas.width / 2;
+        const startAngle = Math.PI * 1.5;
+        const endAngle = Math.PI * 3.5;
+        const speedometerRadius = radius * 0.9;
+        const needleLength = radius * 0.8;
+
+        let myChart = null;
+
+        function drawSpeedometer(speed) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(radius, radius);
+            
+            // Draw the background arc
+            ctx.beginPath();
+            ctx.arc(0, 0, speedometerRadius, startAngle, endAngle);
+            ctx.lineWidth = 20;
+            ctx.strokeStyle = '#ddd';
+            ctx.stroke();
+            
+            // Draw the filled arc based on speed
+            const angle = startAngle + (endAngle - startAngle) * (speed / 15);
+            ctx.beginPath();
+            ctx.arc(0, 0, speedometerRadius, startAngle, angle);
+            ctx.lineWidth = 20;
+            ctx.strokeStyle = '#4caf50';
+            ctx.stroke();
+            
+            // Draw the needle
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            const needleAngle = startAngle + (endAngle - startAngle) * (speed / 15);
+            const needleX = needleLength * Math.cos(needleAngle - Math.PI / 2);
+            const needleY = needleLength * Math.sin(needleAngle - Math.PI / 2);
+            ctx.lineTo(needleX, needleY);
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+            
+            // Draw the speed label
+            ctx.font = '48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#000';
+            ctx.fillText(speed, 0, 20);
+            
+            ctx.restore();
+        }
+
+        function fetchData() {
+            fetch(`https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${readAPIKey}&results=10`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.feeds && data.feeds.length > 0) {
+                        const feeds = data.feeds;
+                        const latestData = parseFloat(feeds[feeds.length - 1].field1);
+                        const latestTemperature = parseFloat(feeds[feeds.length - 1].field2);
+
+                        document.getElementById('data').innerText = `Latest Distance: ${latestData} cm`;
+                        document.getElementById('temperature').innerText = `Latest Temperature: ${latestTemperature} °C`;
+
+                        let message = '';
+                        let messageClass = '';
+                        if (latestData > 8) {
+                            message = "Tank is getting empty";
+                            messageClass = 'message-empty';
+                        } else if (latestData < 3) {
+                            message = "Tank is full";
+                            messageClass = 'message-full';
+                        }
+                        document.getElementById('message').innerText = message;
+                        document.getElementById('message').className = messageClass;
+
+                        let tempMessage = '';
+                        let tempMessageClass = '';
+                        if (latestTemperature > 33) {
+                            tempMessage = "Generator requires maintenance";
+                            tempMessageClass = 'temp-warning';
+                        } else {
+                            tempMessage = "Generator is in good condition";
+                            tempMessageClass = 'temp-good';
+                        }
+                        document.getElementById('temperature-message').innerText = tempMessage;
+                        document.getElementById('temperature-message').className = tempMessageClass;
+
+                        drawSpeedometer(latestData);
+
+                        const labels = feeds.map(feed => new Date(feed.created_at));
+                        const values = feeds.map(feed => feed.field1);
+
+                        if (myChart) {
+                            // Update the chart data
+                            myChart.data.labels = labels;
+                            myChart.data.datasets[0].data = values;
+                            myChart.update();
+                        } else {
+                            // Initialize the chart
+                            const ctx = document.getElementById('myChart').getContext('2d');
+                            myChart = new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: labels,
+                                    datasets: [{
+                                        label: 'Distance (cm)',
+                                        data: values,
+                                        borderColor: 'rgba(75, 192, 192, 1)',
+                                        borderWidth: 2,
+                                        fill: false,
+                                    }]
+                                },
+                                options: {
+                                    scales: {
+                                        x: {
+                                            type: 'time',
+                                            time: {
+                                                unit: 'minute'
+                                            }
+                                        },
+                                        y: {
+                                            beginAtZero: true
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    } else {
+                        console.error("No data available or feeds are undefined");
+                        document.getElementById('data').innerText = "No data available";
+                        document.getElementById('temperature').innerText = "No temperature data available";
+                        document.getElementById('message').innerText = "";
+                        document.getElementById('temperature-message').innerText = "";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching data: ", error);
+                    document.getElementById('data').innerText = "Error fetching data";
+                    document.getElementById('temperature').innerText = "Error fetching temperature data";
+                    document.getElementById('message').innerText = "";
+                    document.getElementById('temperature-message').innerText = "";
+                });
+        }
+
+        setInterval(fetchData, 20000);
+        fetchData();
+    </script>
+</body>
+</html>
